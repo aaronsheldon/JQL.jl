@@ -2,11 +2,11 @@
 abstract AbstractDataView{C, N} <: Enum
 immutable DataView{C, N} <: AbstractDataView{C, N} end
 Base.call(::Type{DataView}) = error("Column name not defined")
-Base.call{R}(::Type{DataView{R}}) = error("Column name not defined")
-Base.call{R, C}(::Type{DataView{R, C}}) = error("Column name not defined")
+Base.call{C}(::Type{DataView{C}}) = error("Column name not defined")
+Base.call{C, N}(::Type{DataView{C, N}}) = error("Column name not defined")
 
 # Generate the column name skins for the column vector store. Each column name-index pair is
-# stored in a  singleton type parameterized by the object id of the columns store, and
+# stored in a singleton type parameterized by the object id of the columns store, and
 # either the symbol of the column, or the index of the column. These two types reflect one
 # another through a pair of overloads on "call" of the type. Effectively this makes the data
 # view an enumeration of the columns.
