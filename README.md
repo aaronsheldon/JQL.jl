@@ -1,4 +1,4 @@
-**JQL** is not a **Q**uery **L**anguage
+JQL *is not a* Query Language
 =======================================
 
 [![Build Status](https://travis-ci.org/aaronsheldon/JQL.jl.svg?branch=master)](https://travis-ci.org/aaronsheldon/JQL.jl)
