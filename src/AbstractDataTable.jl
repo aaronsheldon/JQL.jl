@@ -1,9 +1,5 @@
 # Overloadable skinner for column names
-abstract AbstractDataView{C, N} <: Enum
-immutable DataView{C, N} <: AbstractDataView{C, N} end
-Base.call(::Type{DataView}) = error("Column name not defined")
-Base.call{C}(::Type{DataView{C}}) = error("Column name not defined")
-Base.call{C, N}(::Type{DataView{C, N}}) = error("Column name not defined")
+function DataView end
 
 # Generate the column name skins for the column vector store. Each column name-index pair is
 # stored in a singleton type parameterized by the object id of the columns store, and
@@ -11,25 +7,25 @@ Base.call{C, N}(::Type{DataView{C, N}}) = error("Column name not defined")
 # another through a pair of overloads on "call" of the type. Effectively this makes the data
 # view an enumeration of the columns.
 function _DataView(columns::UInt64, columnname::Symbol, columnindex::Int64)
-	eval(:(Base.call(::Type{DataView{$(columns), $(QuoteNode(columnname))}}) = $(columnindex)))
-	eval(:(Base.call(::Type{DataView{$(columns), $(columnindex)}}) = $(QuoteNode(columnname))))
+	eval(:(DataView(::Val{$(columns)}, ::Val{$(QuoteNode(columnname))}) = $(columnindex)))
+	eval(:(DataView(::Val{$(columns)}, ::Val{$(columnindex)}) = $(QuoteNode(columnname))))
 end
 
 # Courtesy overloads to build and return information about the column names
+setcolumnname(cs::UInt64, n::Symbol, c::Int64 = 1) = _DataView(cs, n, c)
+setcolumnname{T<:Union{AbstractString, Char}}(cs::UInt64, n::T, c::Int64 = 1) = setcolumnname(cs, Symbol(n), c)
 function setcolumnnames(cs::UInt64, ns::Vector{Symbol})
 	if length(ns) != length(unique(ns))
 		error("Column names are not unique")
 	end
 	for n in 1:length(ns)
-		@inbounds _DataView(cs, ns[n], n)
+		@inbounds setcolumnname(cs, ns[n], n)
 	end
 end
-setcolumnnames{T<:AbstractString}(cs::UInt64, ns::AbstractVector{T}) = setcolumnnames(cs, [Symbol(n) for n in ns])
-setcolumnname(cs::UInt64, n::Symbol, c::Int64 = 1) = _DataView(cs, c, c)
-setcolumnname(cs::UInt64, n::AbstractString, c::Int64 = 1) = setcolumnname(cs, Symbol(c), c)
-getcolumnname(cs::UInt64, c::Int64) = DataView{cs, c}()
-getcolumnindex(cs::UInt64, c::Symbol) = DataView{cs, c}()
-getcolumnindex(cs::UInt64, c::AbstractString) = getcolumnindex(cs, Symbol(c))
+setcolumnnames{T<:Union{AbstractString, Char}}(cs::UInt64, ns::AbstractVector{T}) = setcolumnnames(cs, [Symbol(n) for n in ns])
+getcolumnname(cs::UInt64, c::Int64) = DataView(Val{cs}(), Val{c}())
+getcolumnindex(cs::UInt64, c::Symbol) = DataView(Val{cs}(), Val{c}())
+getcolumnindex{T<:Union{AbstractString, Char}}(cs::UInt64, c::T) = getcolumnindex(cs, Symbol(c))
 
 # Bucket all tables with the same column counts together in anticipation of get index
 # overloading. This will minimize the number of overloaded functions added to the system.
@@ -38,7 +34,7 @@ abstract AbstractDataTable{N, R<:NTuple{N}, C<:NTuple{N, AbstractVector}}
 # Courtesy method to check that the table has been constructed properly
 Base.isvalid{N, R, C}(::AbstractDataTable{N, R, C}) =
 	N == length(R.parameters) && N == length(C.parameters) &&
-	all([R.parameters[i] == C.parameters[i].parameters[1] for i = 1:N])
+	all([(R.parameters[i] == C.parameters[i].parameters[1])::Bool for i = 1:N])
 
 # Iterable methods
 Base.start(::AbstractDataTable) = 1

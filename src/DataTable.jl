@@ -1,9 +1,13 @@
+# Unroll the tuple builder for the number of columns
+#
 # Specialize getindex overloading on the number of elements in the returned tuple. For each
 # set of tables with the same number of columns dynamically overload getindex so that a
 # tuple does not have to be dynamically generated using ANY type vectors; which leads to
 # type instability during the call of get index. This also sidesteps splatting into tuples.
 # The net result is that getting or setting into the table by tuple assignment is type
 # stable.
+#
+# ToDo: unroll all the vector methods
 function _getindex(N::Int64)
 	x = :(Base.getindex(D::DataTable{$(N)}, r::Int64) = ())
 	x.args[2].args[2].args = [:(D.columns[$(c)][r]) for c = 1:N][:]
