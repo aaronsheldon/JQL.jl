@@ -2,13 +2,13 @@
 function DataView end
 
 # Generate the column name skins for the column vector store. Each column name-index pair is
-# stored in a singleton type parameterized by the object id of the columns store, and
-# either the symbol of the column, or the index of the column. These two types reflect one
-# another through a pair of overloads on "call" of the type. Effectively this makes the data
-# view an enumeration of the columns.
+# stored in a pair of constant functions, essentially forming a look up table, or
+# enumeration. The functions are typed by the singleton types encoding the object id of the
+# column vector tuple store, and either the symbol of the column name, or the index of the
+# column.
 function _DataView(columns::UInt64, columnname::Symbol, columnindex::Int64)
-	eval(:(DataView(::Val{$(columns)}, ::Val{$(QuoteNode(columnname))}) = $(columnindex)))
-	eval(:(DataView(::Val{$(columns)}, ::Val{$(columnindex)}) = $(QuoteNode(columnname))))
+	eval(:(DataView(::Type{Val{$(columns)}}, ::Type{Val{$(QuoteNode(columnname))}}) = $(columnindex)))
+	eval(:(DataView(::Type{Val{$(columns)}}, ::Type{Val{$(columnindex)}}) = $(QuoteNode(columnname))))
 end
 
 # Courtesy overloads to build and return information about the column names
@@ -23,8 +23,8 @@ function setcolumnnames(cs::UInt64, ns::Vector{Symbol})
 	end
 end
 setcolumnnames{T<:Union{AbstractString, Char}}(cs::UInt64, ns::AbstractVector{T}) = setcolumnnames(cs, [Symbol(n) for n in ns])
-getcolumnname(cs::UInt64, c::Int64) = DataView(Val{cs}(), Val{c}())
-getcolumnindex(cs::UInt64, c::Symbol) = DataView(Val{cs}(), Val{c}())
+getcolumnname(cs::UInt64, c::Int64) = DataView(Val{cs}, Val{c})
+getcolumnindex(cs::UInt64, c::Symbol) = DataView(Val{cs}, Val{c})
 getcolumnindex{T<:Union{AbstractString, Char}}(cs::UInt64, c::T) = getcolumnindex(cs, Symbol(c))
 
 # Bucket all tables with the same column counts together in anticipation of get index
@@ -89,4 +89,16 @@ function Base.splice!{N, R, C}(D::AbstractDataTable{N, R, C}, I, vs::AbstractVec
 	end
 	splice!(D, I, t)
 	vs
+end
+
+@generated convert{R<:Tuple}(::Type{Tuple{[Vector{r} for r in R.parameters]...}}, vs::AbstractVector{R})
+	x = quote
+		t = ()
+		for i = 1:length(vs)
+		end
+		t
+	end
+	x.args[2].args[2].args = [:(Vector{$(c)}(length(vs))) for r in R.parameters]
+	x.args[4].args[2].args = [:(@inbounds t[$(r)][i] = vs[i][$(r)]) for r = 1:length(R.parameters)]
+	x
 end

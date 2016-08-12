@@ -12,8 +12,8 @@ test00symbol = Symbol(test00name)
 
 # Build the singleton types
 _DataView(test00id, test00symbol, test00index)
-@test DataView(Val{test00id}(), Val{test00symbol}()) == test00index
-@test DataView(Val{test00id}(), Val{test00index}()) == test00symbol
+@test DataView(Val{test00id}, Val{test00symbol}) == test00index
+@test DataView(Val{test00id}, Val{test00index}) == test00symbol
 
 # Set up test data for courtesy functions
 test01id = rand(UInt64)
@@ -23,8 +23,8 @@ test01symbol = Symbol(test01name)
 
 # Build the singleton types
 setcolumnname(test01id, test01symbol, test01index)
-@test DataView(Val{test01id}(), Val{test01symbol}()) == test01index
-@test DataView(Val{test01id}(), Val{test01index}()) == test01symbol
+@test DataView(Val{test01id}, Val{test01symbol}) == test01index
+@test DataView(Val{test01id}, Val{test01index}) == test01symbol
 
 # Set up test data for courtesy functions
 test02id = rand(UInt64)
@@ -34,8 +34,8 @@ test02symbol = Symbol(test02name)
 
 # Build the singleton types
 setcolumnname(test02id, test02name, test02index)
-@test DataView(Val{test02id}(), Val{test02symbol}()) == test02index
-@test DataView(Val{test02id}(), Val{test02index}()) == test02symbol
+@test DataView(Val{test02id}, Val{test02symbol}) == test02index
+@test DataView(Val{test02id}, Val{test02index}) == test02symbol
 
 # Make sure unique check works
 @test_throws ErrorException setcolumnnames(rand(UInt64), fill(Symbol(rand([collect('A':'Z'); collect('a':'z')])), rand(1:10)))
@@ -48,8 +48,8 @@ test03symbols = [Symbol(t) for t in test03names]
 
 # Build the singleton types
 setcolumnnames(test03id, test03symbols)
-@test all([DataView(Val{test03id}(), Val{test03symbols[i]}()) == test03indexes[i] for i = 1:52])
-@test all([DataView(Val{test03id}(), Val{test03indexes[i]}()) == test03symbols[i] for i = 1:52])
+@test all([DataView(Val{test03id}, Val{test03symbols[i]}) == test03indexes[i] for i = 1:52])
+@test all([DataView(Val{test03id}, Val{test03indexes[i]}) == test03symbols[i] for i = 1:52])
 
 # Set up test data for courtesy functions
 test04id = rand(UInt64)
@@ -59,8 +59,8 @@ test04symbols = [Symbol(t) for t in test04names]
 
 # Build the singleton types
 setcolumnnames(test04id, test04names)
-@test all([(DataView(Val{test04id}(), Val{test04symbols[i]}()) == test04indexes[i])::Bool for i = 1:52])
-@test all([(DataView(Val{test04id}(), Val{test04indexes[i]}()) == test04symbols[i])::Bool for i = 1:52])
+@test all([(DataView(Val{test04id}, Val{test04symbols[i]}) == test04indexes[i])::Bool for i = 1:52])
+@test all([(DataView(Val{test04id}, Val{test04indexes[i]}) == test04symbols[i])::Bool for i = 1:52])
 
 # Set up test data for courtesy functions
 test05id = rand(UInt64)

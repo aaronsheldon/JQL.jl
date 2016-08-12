@@ -29,8 +29,8 @@ immutable DataTable{N, R, C} <: AbstractDataTable{N, R, C}
 		new{length(C.parameters), Tuple{[c.parameters[1] for c in C.parameters]...}, C}(columns, object_id(columns))
 	end
 
-	# Preallocation or empty constructor
-	function call{R<:Tuple}(::Type{DataTable{R}}, rows::Int64 = 0)
+	# Preallocation constructor
+	function call{R<:Tuple}(::Type{DataTable{R}}, rows::Int64)
 		columns = ([Vector{r}(rows) for r in R.parameters]...)
 		_getindex(length(R.parameters))
 		new{length(R.parameters), R, Tuple{[Vector{r} for r in R.parameters]...}}(columns, object_id(columns))
@@ -43,7 +43,7 @@ function call{R<:Tuple}(::Type{DataTable{R}}, columnnames::AbstractString...)
 	if length(columnnames) != length(R.parameters)
 		error("Incorrect number of column names specified")
 	end
-	D = DataTable{R}()
+	D = DataTable{R}(0)
 	setcolumnnames(D.object, [columnames...])
 	D
 end
