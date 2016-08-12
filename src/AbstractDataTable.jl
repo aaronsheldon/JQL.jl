@@ -51,6 +51,15 @@ Base.ndims(::AbstractDataTable) = 2
 Base.size{N}(D::AbstractDataTable{N}) = (length(D), N)
 Base.linearindexing(::Type{AbstractDataTable}) = Base.LinearFast()
 
+# Un-tuple-ize a vector of tuples into a tuple of vectors
+@generated convert{R<:Tuple}(::Type{Tuple{[Vector{r} for r in R.parameters]...}}, vs::AbstractVector{R})
+	x = :(t = (); for i = 1:length(vs) end; t;)
+	x.args[1].args[2].args = [:(Vector{$(r)}(length(vs))) for r in R.parameters]
+	x.args[2].args[1].args[2].args = [:(@inbounds t[$(r)][i] = vs[i][$(r)]) for r = 1:length(R.parameters)]
+	x
+end
+
+
 # Thin wrappers for the column vector methods
 function Base.push!{N, R, C}(D::AbstractDataTable{N, R, C}, vs::R...)
 	t::C = ([c(length(vs)) for c in C.parameters]...)
@@ -89,16 +98,4 @@ function Base.splice!{N, R, C}(D::AbstractDataTable{N, R, C}, I, vs::AbstractVec
 	end
 	splice!(D, I, t)
 	vs
-end
-
-@generated convert{R<:Tuple}(::Type{Tuple{[Vector{r} for r in R.parameters]...}}, vs::AbstractVector{R})
-	x = quote
-		t = ()
-		for i = 1:length(vs)
-		end
-		t
-	end
-	x.args[2].args[2].args = [:(Vector{$(c)}(length(vs))) for r in R.parameters]
-	x.args[4].args[2].args = [:(@inbounds t[$(r)][i] = vs[i][$(r)]) for r = 1:length(R.parameters)]
-	x
 end
