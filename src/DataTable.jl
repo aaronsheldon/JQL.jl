@@ -1,23 +1,6 @@
-# Unroll the tuple builder for the number of columns
-#
-# Specialize getindex overloading on the number of elements in the returned tuple. For each
-# set of tables with the same number of columns dynamically overload getindex so that a
-# tuple does not have to be dynamically generated using ANY type vectors; which leads to
-# type instability during the call of get index. This also sidesteps splatting into tuples.
-# The net result is that getting or setting into the table by tuple assignment is type
-# stable.
-#
-# ToDo: unroll all the vector methods
-function _getindex(N::Int64)
-	x = :(Base.getindex(D::DataTable{$(N)}, r::Int64) = ())
-	x.args[2].args[2].args = [:(D.columns[$(c)][r]) for c = 1:N][:]
-	eval(x)
-end
-
 # A concrete table is specified by its column types
 immutable DataTable{N, R, C} <: AbstractDataTable{N, R, C}
 	columns::C
-	object::UInt64
 
 	# Columns constructor
 	function call{C<:Tuple{Vararg{AbstractVector}}}(::Type{DataTable}, columns::C)
@@ -26,14 +9,14 @@ immutable DataTable{N, R, C} <: AbstractDataTable{N, R, C}
 			error("Columns are not equal length")
 		end
 		_getindex(length(C.parameters))
-		new{length(C.parameters), Tuple{[c.parameters[1] for c in C.parameters]...}, C}(columns, object_id(columns))
+		new{length(C.parameters), Tuple{[c.parameters[1] for c in C.parameters]...}, C}(columns)
 	end
 
 	# Preallocation constructor
 	function call{R<:Tuple}(::Type{DataTable{R}}, rows::Int64)
 		columns = ([Vector{r}(rows) for r in R.parameters]...)
 		_getindex(length(R.parameters))
-		new{length(R.parameters), R, Tuple{[Vector{r} for r in R.parameters]...}}(columns, object_id(columns))
+		new{length(R.parameters), R, Tuple{[Vector{r} for r in R.parameters]...}}(columns)
 	end
 end
 
@@ -78,37 +61,6 @@ function DataTable(rows::Int64 = 0; keywords...)
 	setcolumnnames(D.object, k)
 	D
 end
-
-# Courtesy method to check that the table has not been messed with
-Base.isvalid{N}(D::DataTable{N}) =
-	minimum([length(D.columns[c]) for c = 1:N]) == maximum([length(D.columns[c]) for c = 1:N]) &&
-	length(unique([DataView{D.object, c}() for c = 1:N])) == N &&
-	all([DataView{D.object, DataView{D.object, c}()}() == c for c = 1:N]) &&
-	length(D.columns) == N && D.object == object_id(D.columns) && isvalid(D::AbstractDataTable)
-
-# Iterable methods
-Base.length{N}(D::DataTable{N}) = minimum([length(D.columns[c]) for c = 1:N])
-
-# Collection methods
-function Base.empty!{N}(D::DataTable{N})
-	for c = 1:N
-		@inbounds empty!(D.columns[c])
-	end
-	D
-end
-
-# Indexable methods, ignore getindex, it is overloaded on explicit instantiation
-# A single row gets a type stable tuple
-# Base.getindex{N}(D::DataTable{N}, r::Int64) = ([D.columns[c][r] for c = 1:N]...)
-
-# A single column returns a vector; type unstable
-Base.getindex(D::DataTable, c::Symbol) = D.columns[DataView{D.object, c}()]
-Base.getindex(D::DataTable, c::AbstractString) = D.columns[Symbol(c)]
-
-# A single row and column pair returns an element; type unstable
-Base.getindex(D::DataTable, r::Int64, c::Int64) = D.columns[c][r]
-Base.getindex(D::DataTable, r::Int64, c::Symbol) = D[r, DataView{D.object, c}()]
-Base.getindex(D::DataTable, r::Int64, c::AbstractString) = D[r, Symbol(c)]
 
 # To prevent inadvertent casting only concrete types can create concrete types
 # These are horribly not type stable. To prevent syntax collision to get a table both ranges
@@ -157,14 +109,6 @@ Base.getindex(D::DataTable, rs::Union{Int64, Vector{Int64}, Range{Int64}, Colon}
 Base.getindex(D::DataTable, rs::Union{Vector{Int64}, Range{Int64}, Colon}, cs::AbstractString...) = D[rs, [Symbol(c) for c in cs]]
 Base.getindex(D::DataTable, rs::Int64, c::AbstractString, cs::AbstractString...) = D[rs, [Symbol(c); [Symbol(c) for c in cs]]]
 
-# Setting a whole row by a tuple is type stable
-function Base.setindex!{N, R, C}(D::DataTable{N, R, C}, v::R, r::Int64)
-	for c = 1:N
-		@inbounds D.columns[c][r] = v[c]
-	end
-	v
-end
-
 # Setting single elements is not type stable
 Base.setindex!(D::DataTable, v, r::Int64, c::Int64) = D.columns[c][r] = v
 Base.setindex!(D::DataTable, v, r::Int64, c::Symbol) = D[r, DataView{D.object, c}()] = v
@@ -174,12 +118,12 @@ Base.setindex!(D::DataTable, v, r::Int64, c::AbstractString) = D[r, Symbol(c)] =
 # naming rights. hcat works like inner join on row index.
 function Base.vcat{N, R, C}(Ds::DataTable{N, R, C}...)
 	E = DataTable(([vcat([D.columns(c) for D in Ds]...) for c = 1:N]...))
-	setnames(E.object, [DataView{Ds[1].object, c}() for c = 1:N])
+	setcolumnnames(E.object, [DataView{Ds[1].object, c}() for c = 1:N])
 	E
 end
 function Base.hcat(Ds::DataTable...)
 	E = DataTable((vcat([[D.columns...] for D in Ds]...)...), vcat([D.columnnames for D in Ds]...))
-	setnames(E.object, vcat([[DataView{D.object, c}() for c = 1:length(D.columns)] for D in Ds]...))
+	setcolumnnames(E.object, vcat([[DataView{D.object, c}() for c = 1:length(D.columns)] for D in Ds]...))
 	E
 end
 
@@ -229,3 +173,43 @@ function Base.prepend!{N, R, C}(D::DataTable{N, R, C}, cs::C)
 	D
 end
 Base.prepend!{N, R, C}(D::DataTable{N, R, C}, E::DataTable{N, R, C}) = prepend!(D, E.columns)
+
+# Thin wrappers for the column vector methods
+function Base.push!{N, R, C}(D::AbstractDataTable{N, R, C}, vs::R...)
+	t::C = ([c(length(vs)) for c in C.parameters]...)
+	for j = 1:length(vs)
+		for i = 1:N
+			@inbounds t[i][j] = vs[j][i]
+		end
+	end
+	append!(D, t)
+end
+function Base.pop!{N, R, C}(D::AbstractDataTable{N, R, C}, r::Int64 = length(D), d::R = D[r])
+	if 0 < r && r <= length(D)
+		v = D[r]
+		deleteat!(D, r)
+	else
+		v = d
+	end
+	v
+end
+function Base.unshift!{N, R, C}(D::AbstractDataTable{N, R, C}, vs::R...)
+	t::C = ([c(length(vs)) for c in C.parameters]...)
+	for j = 1:length(vs)
+		for i = 1:N
+			@inbounds t[i][j] = vs[j][i]
+		end
+	end
+	prepend!(D, t)
+end
+Base.shift!(D::AbstractDataTable) = pop!(D, 1)
+function Base.splice!{N, R, C}(D::AbstractDataTable{N, R, C}, I, vs::AbstractVector{R})
+	t::C = ([c(length(vs)) for c in C.parameters]...)
+	for j = 1:length(vs)
+		for i = 1:N
+			@inbounds t[i][j] = vs[j][i]
+		end
+	end
+	splice!(D, I, t)
+	vs
+end
