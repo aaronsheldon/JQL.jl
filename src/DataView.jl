@@ -1,8 +1,8 @@
-# Overloadable skinner for column names
-# Make this a singleton and overload call to ensure it is parameterized by abstract data
-# table
+# Overloadable skinner for column names. This provides a generic method for naming the
+# fields of a specific tuple instance. This data type provides an iterable interface to
+# the field names
 immutable DataView{N}
-	table::AbstractDataTable{N}
+	tuple::NTuple{N}
 end
 
 # Generate the column name skins for the column vector store. Each column name-index pair is
